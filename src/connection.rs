@@ -1,21 +1,14 @@
-use std::net::{SocketAddrV4, Ipv4Addr, TcpListener, TcpStream};
-use std::io::{self, Write, Read, BufReader, BufRead, BufWriter};
-use std::option;
-use std::sync::{Mutex, Arc, Condvar};
-use std::sync::RwLock;
-use std::sync::mpsc; 
+use std::net::{TcpStream};
+use std::io::{Write, BufReader, BufRead};
+use std::sync::{Mutex, Arc};
 use std::thread;
 use rand::Rng;
 
 use crossbeam::channel::unbounded;
-use concurrent_queue::ConcurrentQueue;
+
 use crate::key::Key;
-use crate::Client;
-use crate::client::PeerRecord;
-use crate::client::parse_peer_record;
-use crate::client::create_empty_peer_record;
-use crate::client::DHT_Type;
-use crate::client::parse_providers;
+use crate::client::{PeerRecord, parse_peer_record, create_empty_peer_record, DhtType, parse_providers};
+
 
 pub type ConnectionRef = Arc<Connection>;
 
@@ -25,7 +18,7 @@ pub struct DHTMessage {
     pub sending_node: PeerRecord,
     pub key: PeerRecord,
     pub keys: Vec<PeerRecord>,
-    pub data: (Key, DHT_Type),
+    pub data: (Key, DhtType),
     pub providers: Vec<(String, Key)>,
 }
 
@@ -36,12 +29,12 @@ pub struct Message {
     pub to: PeerRecord,
     pub key: PeerRecord,
     pub keys: Vec<PeerRecord>,
-    pub data: (Key, DHT_Type),
+    pub data: (Key, DhtType),
     pub providers: Vec<(String, Key)>,
 }
 
 impl Message {
-    pub fn new(type_of : String, from: PeerRecord, to: PeerRecord, key: PeerRecord, data_key: Key, data: DHT_Type) -> Message {
+    pub fn new(type_of : String, from: PeerRecord, to: PeerRecord, key: PeerRecord, data_key: Key, data: DhtType) -> Message {
         return Message {type_of : type_of, from: from, to: to, key: key, keys: Vec::new(), data: (data_key, data), providers: Vec::new()};
     }
     
@@ -75,7 +68,6 @@ impl Message {
             let output = format!("P2P/1.0 {}\r\nFROM- ({},{})\r\nTO- ({},{})\r\n\r\n", self.type_of, self.from.0.key, self.from.1, self.to.0.key, self.to.1);
             return output;
         } else if self.type_of == "INSERT" {
-            let (key_val, addr) = &self.key;
             let output = format!("P2P/1.0 {}\r\nFROM- ({},{})\r\nTO- ({},{})\r\nPROVIDER-{}\r\nDATA- ({},{})\r\n\r\n", self.type_of, self.from.0.key, self.from.1, self.to.0.key, self.to.1, self.key.1, self.data.0.key, self.data.1);
             return output;
         } else if self.type_of == "PEERS_I_GET" {
@@ -112,12 +104,11 @@ impl Message {
         let mut to = create_empty_peer_record();
         let mut found_key: PeerRecord = (Key{key:0}, "".to_string());
         let mut keys: Vec<PeerRecord> = Vec::new();
-        let mut data: (Key, DHT_Type) = (Key{key:0}, "".to_string());
+        let mut data: (Key, DhtType) = (Key{key:0}, "".to_string());
         let mut providers: Vec<(String, Key)> = Vec::new();
         loop  {
             let mut line = String::with_capacity(512);
             reader.read_line(&mut line).unwrap();
-            line.trim();
             if line == "\r\n" {
                 break;
             }
@@ -182,13 +173,13 @@ impl Clone for Connection {
 }
 
 impl Connection { 
-    pub fn new(mut stream : TcpStream, read: bool, write: bool) -> ConnectionRef {
+    pub fn new(stream : TcpStream, read: bool, write: bool) -> ConnectionRef {
         let (send_job, recieve_job): (crossbeam::channel::Sender<Message>, crossbeam::channel::Receiver<Message>)= unbounded();
         let (send_dht, recieve_dht): (crossbeam::channel::Sender<DHTMessage>, crossbeam::channel::Receiver<DHTMessage>)= unbounded();
 
         let mut rng = rand::thread_rng();
         let rand_id = rng.gen::<u32>();
-        let mut conn = Connection {
+        let conn = Connection {
             id: rand_id,
             sender: send_job, 
             receiver: recieve_job, 
@@ -203,13 +194,12 @@ impl Connection {
             let stream_read = stream.try_clone().unwrap();
             thread::spawn(move || {
                 match read_thread(stream_read, ptr_read) {
-                   Err(e) => {},
+                   Err(_) => {},
                    _ => {} ,
                 }
             });
         }
         
-       
         if write {
             let ptr_write= console_ptr.clone();
             let stream_write = stream.try_clone().unwrap();
@@ -222,12 +212,11 @@ impl Connection {
     }
 }
 
-fn read_thread(mut stream: TcpStream, mut connection: ConnectionRef) -> Result<(), &'static str> {
+fn read_thread(stream: TcpStream, connection: ConnectionRef) -> Result<(), &'static str> {
     let mut reader = BufReader::new(stream);
-    while true {
-        let mut line = String::with_capacity(512);
+    loop {
 
-        let mut msg = Message::read_message(&mut reader)?;
+        let msg = Message::read_message(&mut reader)?;
 
         if msg.type_of == "INIT" {
 
@@ -326,21 +315,13 @@ fn read_thread(mut stream: TcpStream, mut connection: ConnectionRef) -> Result<(
         }
 
     } 
-
-    return Ok(());
-
 }
 
 fn write_thread(mut stream: TcpStream, connection: ConnectionRef) {
     loop {
         let msg : Message = connection.receiver.recv().unwrap();
-        let res = stream.write(msg.make_message().as_bytes()).unwrap();
+        let _res = stream.write(msg.make_message().as_bytes()).unwrap();
         stream.flush().unwrap();
     }
     
-}
-
-fn write_message(msg: Message, mut stream: TcpStream) {
-    stream.write(msg.make_message().as_bytes()).unwrap();
-    let res = stream.flush().unwrap();
 }

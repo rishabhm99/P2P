@@ -1,17 +1,10 @@
-use std::net::{SocketAddrV4, Ipv4Addr, TcpListener, TcpStream};
-use std::sync::{Arc, Mutex};
-use std::io::{self, Write, Read, BufReader, BufRead, BufWriter};
+use std::io::{self, Write};
 use std::error::Error;
-use console::Term;
 
 use crate::Client;
-use crate::connection::Message;
-use crate::connection::Connection;
-use crate::client::PeerRecord;
 use crate::key::Key;
 
-pub fn console(mut client : Box<Client>) {
-    let mut term = Term::stdout();
+pub fn console(client : Box<Client>) {
     // Kick it off.
     loop {
         let mut line = String::new();

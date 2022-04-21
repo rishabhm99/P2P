@@ -1,21 +1,11 @@
-use std::net::{SocketAddrV4, Ipv4Addr, TcpListener, TcpStream};
-use std::io::{self, Write, Read, BufReader, BufRead, BufWriter};
-use std::option;
-use std::sync::{Mutex, Arc, Condvar};
-use std::sync::RwLock;
-use std::sync::mpsc; 
-use std::thread;
-use std::error::Error;
+use std::net::{TcpListener, TcpStream};
+use std::io::{BufReader};
+use std::sync::{Mutex, Arc};
 
-use crossbeam::channel::unbounded;
-use concurrent_queue::ConcurrentQueue;
 
-use std::collections::{HashMap, HashSet};
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hasher, Hash};
+use std::collections::{HashMap};
 use priority_queue::PriorityQueue;
 use rand::Rng;
-use rand::distributions::Uniform;
 
 use crate::connection::{Connection, ConnectionRef};
 use crate::connection::Message;
@@ -25,7 +15,7 @@ const BOOTNODES: [&'static  str; 1] = [
     "127.0.0.1:12345"
 ];
 
-pub type DHT_Type = String;
+pub type DhtType = String;
 pub type PeerRecord = (Key, String);
 
 pub fn parse_peer_record(peer_record: &str) -> PeerRecord {
@@ -78,15 +68,15 @@ pub struct Client {
 
     pub providers : Arc<Mutex<HashMap<String, Key>>>,
     pub known_nodes : Arc<Mutex<HashMap<Key, String>>>,
-    pub local_hash : Arc<Mutex<HashMap<Key, DHT_Type>>>,
+    pub local_hash : Arc<Mutex<HashMap<Key, DhtType>>>,
 }
 
 
 impl Client {
     pub fn new(host: String, port: String) -> Box<Client> {
-        let mut connections: Vec<ConnectionRef> = vec![];
+        let connections: Vec<ConnectionRef> = vec![];
         let mut known_nodes =  HashMap::new();
-        let mut providers =  HashMap::new();
+        let providers =  HashMap::new();
 
         println!("{} {}", host, port);
 
@@ -133,36 +123,24 @@ impl Client {
         self.get_peer_record();
 
         for stream in listener.incoming() {
-            let mut stream = stream.unwrap();
+            let stream = stream.unwrap();
             let connection = Connection::new(stream, true, true);
             self.connections.lock().unwrap().push(connection);
         }
-    }
-    
-    pub fn reaper(&mut self, mut connection: ConnectionRef) {
-        /*
-        while true {
-            for conn in self.connections.iter() {
-                if conn.finished {
-
-                }
-            }
-        }
-        */
     }
 
     pub fn poll(&mut self) {
         // TEMP FIX NEED THIS FOR SOME REASON: PERTANING TO BLOCKING PROBABLY
         print!("");
-        while true {
+        loop {
             let vec = &*self.connections.lock().unwrap();
             for connection in vec {
-                let mut msg = match connection.recieve_dht.try_recv() {
+                let msg = match connection.recieve_dht.try_recv() {
                     Ok(msg) => {
                         msg
                     },
                     
-                    Err(e)  => continue,
+                    Err(_)  => continue,
                 };
 
 
@@ -199,15 +177,15 @@ impl Client {
         }
     }
 
-    pub fn get_data(&mut self, find_key: Key) -> DHT_Type {
+    pub fn get_data(&mut self, find_key: Key) -> DhtType {
         let comps  = self.find_k_closest_computers(&find_key);
 
-        let mut data : (Key, DHT_Type) = (Key {key: 0}, "".to_string());
+        let mut data : (Key, DhtType) = (Key {key: 0}, "".to_string());
         let mut vec: Vec<u32> = Vec::new();
         for (key, address) in comps.clone() {
             if key == self.key {continue;}
 
-            let mut stream = TcpStream::connect(address.clone()).unwrap();
+            let stream = TcpStream::connect(address.clone()).unwrap();
             let mut reader = BufReader::new(stream.try_clone().unwrap());
             let peer_record: PeerRecord = (key, address.clone());
             let msg : Message  = Message::new(
@@ -223,7 +201,6 @@ impl Client {
             
             // SEND TO PEERS REQUESTING K_CLOSEST
             let connection  = Connection::new(stream.try_clone().unwrap(), false, true);
-            let id = connection.id.clone();
             {
                 connection.sender.send(msg);
             }
@@ -237,7 +214,7 @@ impl Client {
         for (i, (key, address)) in comps.clone().iter().enumerate() {
             if *key == self.key {continue;}
             if vec[i] == 0 { continue; }
-            let mut stream = TcpStream::connect(address.clone()).unwrap();
+            let stream = TcpStream::connect(address.clone()).unwrap();
             let mut reader = BufReader::new(stream.try_clone().unwrap());
             let peer_record: PeerRecord = (key.clone(), address.clone());
             let msg : Message  = Message::new(
@@ -253,7 +230,6 @@ impl Client {
             
             // SEND TO PEERS REQUESTING K_CLOSEST
             let connection  = Connection::new(stream.try_clone().unwrap(), false, true);
-            let id = connection.id.clone();
             {
                 connection.sender.send(msg);
             }
@@ -266,7 +242,7 @@ impl Client {
         return "".to_string();
     }
 
-    pub fn put_data(&mut self, name: String, file_name : DHT_Type) -> () {
+    pub fn put_data(&mut self, name: String, file_name : DhtType) -> () {
         let calc_key = Key::generate_hash_from_data(&file_name);
 
         self.local_hash.lock().unwrap().insert(calc_key, file_name.clone());    
@@ -276,8 +252,7 @@ impl Client {
         for (key, address) in comps {
             if key == self.key {continue;}
 
-            let mut stream = TcpStream::connect(address.clone()).unwrap();
-            let mut reader = BufReader::new(stream.try_clone().unwrap());
+            let stream = TcpStream::connect(address.clone()).unwrap();
             let peer_record: PeerRecord = (Key{key:0}, name.clone());
             let msg : Message  = Message::new(
                                             "INSERT".to_string(), 
@@ -292,7 +267,6 @@ impl Client {
             
             // SEND TO PEERS REQUESTING K_CLOSEST
             let connection  = Connection::new(stream.try_clone().unwrap(), false, true);
-            let id = connection.id.clone();
             {
                 connection.sender.send(msg);
             }
@@ -301,15 +275,11 @@ impl Client {
         }             
     }
 
-    pub fn put_peer_record(&mut self) {
-
-    }
-
     pub fn get_peer_record(&mut self) {
         let comps  = self.find_k_closest_computers(&self.key);
         for (key, address) in comps {
 
-            let mut stream = TcpStream::connect(address.clone()).unwrap();
+            let stream = TcpStream::connect(address.clone()).unwrap();
             let mut reader = BufReader::new(stream.try_clone().unwrap());
 
             let peer_record: PeerRecord = (key, address.clone());
@@ -326,7 +296,6 @@ impl Client {
             
             // SEND TO PEERS REQUESTING K_CLOSEST
             let connection  = Connection::new(stream.try_clone().unwrap(), false, true);
-            let id = connection.id.clone();
             {
                 connection.sender.send(msg);
             }
@@ -347,10 +316,9 @@ impl Client {
     
     pub fn ping(&mut self, key: Key) -> Option<String> {
         let address = self.known_nodes.lock().unwrap().get(&key)?.clone();
-        let mut stream = TcpStream::connect(address.clone()).unwrap();
+        let stream = TcpStream::connect(address.clone()).unwrap();
         let mut reader = BufReader::new(stream.try_clone().unwrap());
 
-        let peer_record: PeerRecord = (key, address.clone());
         let msg : Message  = Message::new(
                                         "PING".to_string(), 
                                         (self.key.clone(), self.host.clone()), 
@@ -362,22 +330,21 @@ impl Client {
 
         
         let connection  = Connection::new(stream.try_clone().unwrap(), false, true);
-        let id = connection.id.clone();
         {
             connection.sender.send(msg);
         }
-        let msg = Message::read_message(&mut reader).unwrap();
+        Message::read_message(&mut reader).unwrap();
 
         return Some("Success".to_string());
     }
     
-    pub fn get_providers(&mut self) -> Option<DHT_Type> {
+    pub fn get_providers(&mut self) -> Option<DhtType> {
 
         let comps  = self.find_k_closest_computers(&self.key);
         for (key, address) in comps {
             if key == self.key {continue;}
 
-            let mut stream = TcpStream::connect(address.clone()).unwrap();
+            let stream = TcpStream::connect(address.clone()).unwrap();
             let mut reader = BufReader::new(stream.try_clone().unwrap());
             let peer_record: PeerRecord = (self.key.clone(), self.host.clone());
             let msg : Message  = Message::new(
@@ -393,7 +360,6 @@ impl Client {
             
             // SEND TO PEERS REQUESTING K_CLOSEST
             let connection  = Connection::new(stream.try_clone().unwrap(), false, true);
-            let id = connection.id.clone();
             {
                 connection.sender.send(msg);
             }
@@ -420,10 +386,10 @@ impl Client {
             pqueue_distance.push((*curr_key, item.to_string()), key.distance(*curr_key));
         }
 
-        for i in 1..K {
+        for _ in 1..K {
             if pqueue_distance.is_empty() { break };
 
-            let (peer_record, val) = pqueue_distance.pop().unwrap(); 
+            let (peer_record, _) = pqueue_distance.pop().unwrap(); 
             k_closest.push(peer_record);
         }
         return k_closest;
