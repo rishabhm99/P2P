@@ -68,13 +68,13 @@ impl Message {
             let output = format!("P2P/1.0 {}\r\nFROM- ({},{})\r\nTO- ({},{})\r\n\r\n", self.type_of, self.from.0.key, self.from.1, self.to.0.key, self.to.1);
             return output;
         } else if self.type_of == "INSERT" {
-            let output = format!("P2P/1.0 {}\r\nFROM- ({},{})\r\nTO- ({},{})\r\nPROVIDER-{}\r\nDATA- ({},{})\r\n\r\n", self.type_of, self.from.0.key, self.from.1, self.to.0.key, self.to.1, self.key.1, self.data.0.key, self.data.1);
+            let output = format!("P2P/1.0 {}\r\nFROM- ({},{})\r\nTO- ({},{})\r\nPROVIDER-{}\r\nDATA_KEY- {}\r\nDATA- {}\r\n\r\n", self.type_of, self.from.0.key, self.from.1, self.to.0.key, self.to.1, self.key.1, self.data.0.key, self.data.1);
             return output;
         } else if self.type_of == "PEERS_I_GET" {
-            let output = format!("P2P/1.0 {}\r\nFROM- ({},{})\r\nTO- ({},{})\r\nDATA- ({},{})\r\n\r\n", self.type_of, self.from.0.key, self.from.1, self.to.0.key, self.to.1, self.data.0.key, self.data.1);
+            let output = format!("P2P/1.0 {}\r\nFROM- ({},{})\r\nTO- ({},{})\r\nDATA_KEY- {}\r\nDATA- {}\r\n\r\n", self.type_of, self.from.0.key, self.from.1, self.to.0.key, self.to.1, self.data.0.key, self.data.1);
             return output;
         } else if self.type_of == "PEERS_R_GET" {
-            let output = format!("P2P/1.0 {}\r\nFROM- ({},{})\r\nTO- ({},{})\r\nDATA- ({},{})\r\n\r\n", self.type_of, self.from.0.key, self.from.1, self.to.0.key, self.to.1, self.data.0.key, self.data.1);
+            let output = format!("P2P/1.0 {}\r\nFROM- ({},{})\r\nTO- ({},{})\r\nDATA_KEY- {}\r\nDATA- {}\r\n\r\n", self.type_of, self.from.0.key, self.from.1, self.to.0.key, self.to.1, self.data.0.key, self.data.1);
             return output;
         }
         "".to_string()
@@ -105,6 +105,8 @@ impl Message {
         let mut found_key: PeerRecord = (Key{key:0}, "".to_string());
         let mut keys: Vec<PeerRecord> = Vec::new();
         let mut data: (Key, DhtType) = (Key{key:0}, "".to_string());
+        let mut data_key = Key{key:0};
+        let mut data_val = "".to_string();
         let mut providers: Vec<(String, Key)> = Vec::new();
         loop  {
             let mut line = String::with_capacity(512);
@@ -118,7 +120,7 @@ impl Message {
             
             let mut args = line.split('-');
             let key = args.next().ok_or("Error Parsing")?;
-            let val = args.next().ok_or("Error Parsing")?;
+            let mut val = args.next().ok_or("Error Parsing")?;
 
             if key == "FROM" {
                 from = parse_peer_record(val);
@@ -135,7 +137,11 @@ impl Message {
                     keys.push(peer);
                 }
             } else if key == "DATA" {
-                data = parse_peer_record(val);
+                val = val.trim();
+                data = (data_key, val.to_string());
+            } else if key == "DATA_KEY" {
+                let key = val.trim().parse::<u32>().unwrap();
+                data_key = Key{key:key};
             } else if key == "PROVIDERS" {
                 let trimmed = val.trim();
                 if trimmed.len() == 0 { continue; }

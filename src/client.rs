@@ -1,7 +1,7 @@
 use std::net::{TcpListener, TcpStream};
 use std::io::{BufReader};
 use std::sync::{Mutex, Arc};
-
+use std::fmt::{self, Display};
 
 use std::collections::{HashMap};
 use priority_queue::PriorityQueue;
@@ -11,12 +11,35 @@ use crate::connection::{Connection, ConnectionRef};
 use crate::connection::Message;
 use crate::key::Key;
 
+const K : i32 = 20;
 const BOOTNODES: [&'static  str; 1] = [
     "127.0.0.1:12345"
 ];
 
+#[derive(Clone)]
+pub struct Data {
+    id: u32,
+    vec: Vec<u8>,
+}
+
+pub fn create_empty() -> Data {
+    return Data{id: 0, vec: Vec::new()};
+}
+
+impl Display for Data {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "id: {}", self.id)
+    }
+}
+impl PartialEq for Data {
+    fn eq(&self, other: &Data) -> bool {
+        return self.id == other.id;
+    }
+}
+
 pub type DhtType = String;
 pub type PeerRecord = (Key, String);
+
 
 pub fn parse_peer_record(peer_record: &str) -> PeerRecord {
     let val = peer_record.trim();
@@ -52,11 +75,6 @@ pub fn empty_data(data: &(Key, String)) -> bool {
     }
     return false;
 }
-
-
-
-
-const K : i32 = 20;
 
 #[derive(Clone)]
 pub struct Client {
