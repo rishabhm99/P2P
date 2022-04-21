@@ -18,17 +18,20 @@ const BOOTNODES: [&'static  str; 1] = [
 
 #[derive(Clone)]
 pub struct Data {
-    id: u32,
-    vec: Vec<u8>,
+    pub id: u32,
+    pub vec: Vec<u8>,
 }
 
-pub fn create_empty() -> Data {
-    return Data{id: 0, vec: Vec::new()};
+impl Data {
+    pub fn create_empty() -> Data {
+        return Data{id: 0, vec: Vec::new()};
+    }
 }
 
 impl Display for Data {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "id: {}", self.id)
+        let dat = String::from_utf8(self.vec.clone()).expect("");
+        write!(f, "{}", dat)
     }
 }
 impl PartialEq for Data {
@@ -37,7 +40,7 @@ impl PartialEq for Data {
     }
 }
 
-pub type DhtType = String;
+pub type DhtType = Data;
 pub type PeerRecord = (Key, String);
 
 
@@ -69,7 +72,7 @@ pub fn create_empty_peer_record() -> PeerRecord {
     (Key{key:0}, "".to_string())
 }
 
-pub fn empty_data(data: &(Key, String)) -> bool {
+pub fn empty_data(data: &(Key, Data)) -> bool {
     if data.0.key == 0 {
         return true;
     }
@@ -170,9 +173,9 @@ impl Client {
                     let data = new_msg.data.clone();
                     if empty_data(&data) == false {
                         if self.local_hash.lock().unwrap().contains_key(&data.0) {
-                            self.providers.lock().unwrap().insert(new_msg.data.1, new_msg.data.0);    
+                            self.providers.lock().unwrap().insert(new_msg.name, new_msg.data.0);    
                             let val = self.local_hash.lock().unwrap().get(&new_msg.data.0).unwrap().to_string();
-                            new_msg.data.1 = val;
+                            new_msg.name = val;
 
                         }
                      
@@ -198,7 +201,7 @@ impl Client {
     pub fn get_data(&mut self, find_key: Key) -> DhtType {
         let comps  = self.find_k_closest_computers(&find_key);
 
-        let mut data : (Key, DhtType) = (Key {key: 0}, "".to_string());
+        let mut data : (Key, DhtType) = (Key {key: 0}, Data::create_empty());
         let mut vec: Vec<u32> = Vec::new();
         for (key, address) in comps.clone() {
             if key == self.key {continue;}
@@ -212,7 +215,7 @@ impl Client {
                                             (key.clone(), address.clone()), 
                                             peer_record,
                                             find_key,
-                                            "EMPTY".to_string(),
+                                            Data::create_empty(),
                                         );
 
             
@@ -225,7 +228,7 @@ impl Client {
             // Recieve K_Closest
             let msg = Message::read_message(&mut reader).unwrap();
             data = (msg.data.0, msg.data.1.clone());
-            if data.1 == "EMPTY" {vec.push(1);}
+            if data.1 == Data::create_empty() {vec.push(1);}
             else { vec.push(0); }
         }
 
@@ -255,15 +258,15 @@ impl Client {
             let msg = Message::read_message(&mut reader).unwrap();
             data = (msg.data.0, msg.data.1.clone());
         }
-        self.local_hash.lock().unwrap().insert(data.0, data.1.clone().to_string());    
+        self.local_hash.lock().unwrap().insert(data.0, data.1.clone());    
 
-        return "".to_string();
+        return Data::create_empty();
     }
 
-    pub fn put_data(&mut self, name: String, file_name : DhtType) -> () {
-        let calc_key = Key::generate_hash_from_data(&file_name);
+    pub fn put_data(&mut self, name: String, data : DhtType) -> () {
+        let calc_key = Key::generate_hash_from_data(&name);
 
-        self.local_hash.lock().unwrap().insert(calc_key, file_name.clone());    
+        self.local_hash.lock().unwrap().insert(calc_key, data.clone());    
         self.providers.lock().unwrap().insert(name.clone(), calc_key.clone());    
 
         let comps  = self.find_k_closest_computers(&calc_key);
@@ -278,7 +281,7 @@ impl Client {
                                             (key.clone(), address.clone()), 
                                             peer_record,
                                             calc_key.clone(),
-                                            file_name.clone(),
+                                            data.clone(),
                                         );
 
             
@@ -307,7 +310,7 @@ impl Client {
                                             (key.clone(), address.clone()), 
                                             peer_record,
                                             Key{key:0},
-                                            "EMPTY".to_string(),
+                                            Data::create_empty(),
                                         );
 
             
@@ -343,7 +346,7 @@ impl Client {
                                         (key.clone(), address.clone()), 
                                         create_empty_peer_record(),
                                         Key{key:0},
-                                        "EMPTY".to_string(),
+                                        Data::create_empty(),
                                         );
 
         
@@ -371,7 +374,7 @@ impl Client {
                                             (key.clone(), address.clone()), 
                                             peer_record,
                                             self.key.clone(),
-                                            "EMPTY".to_string(),
+                                            Data::create_empty(),
                                         );
 
             

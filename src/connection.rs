@@ -7,8 +7,8 @@ use rand::Rng;
 use crossbeam::channel::unbounded;
 
 use crate::key::Key;
-use crate::client::{PeerRecord, parse_peer_record, create_empty_peer_record, DhtType, parse_providers};
-
+use crate::client::{PeerRecord, parse_peer_record, create_empty_peer_record, DhtType, parse_providers, Data};
+use crate::client::empty_data;
 
 pub type ConnectionRef = Arc<Connection>;
 
@@ -20,6 +20,7 @@ pub struct DHTMessage {
     pub keys: Vec<PeerRecord>,
     pub data: (Key, DhtType),
     pub providers: Vec<(String, Key)>,
+    pub name: String,
 }
 
 #[derive(Clone)]
@@ -29,8 +30,8 @@ pub struct Message {
     pub to: PeerRecord,
     pub key: PeerRecord,
     pub keys: Vec<PeerRecord>,
-    pub data: (Key, DhtType),
     pub providers: Vec<(String, Key)>,
+    pub data: (Key, DhtType),
 }
 
 impl Message {
@@ -104,7 +105,7 @@ impl Message {
         let mut to = create_empty_peer_record();
         let mut found_key: PeerRecord = (Key{key:0}, "".to_string());
         let mut keys: Vec<PeerRecord> = Vec::new();
-        let mut data: (Key, DhtType) = (Key{key:0}, "".to_string());
+        let mut data: (Key, DhtType) = (Key{key:0}, Data::create_empty());
         let mut data_key = Key{key:0};
         let mut data_val = "".to_string();
         let mut providers: Vec<(String, Key)> = Vec::new();
@@ -138,7 +139,7 @@ impl Message {
                 }
             } else if key == "DATA" {
                 val = val.trim();
-                data = (data_key, val.to_string());
+                data = (data_key, Data {id: 1, vec: val.to_string().into_bytes()});
             } else if key == "DATA_KEY" {
                 let key = val.trim().parse::<u32>().unwrap();
                 data_key = Key{key:key};
@@ -239,6 +240,7 @@ fn read_thread(stream: TcpStream, connection: ConnectionRef) -> Result<(), &'sta
                 keys: Vec::new(),
                 data: new_msg.data.clone(),
                 providers: Vec::new(),
+                name: "".to_string(),
             };
             connection.send_dht.send(dht_msg);
             let key_msg : DHTMessage = connection.recieve_dht.recv().unwrap();
@@ -265,6 +267,7 @@ fn read_thread(stream: TcpStream, connection: ConnectionRef) -> Result<(), &'sta
                 keys: Vec::new(),
                 data: new_msg.data.clone(),
                 providers: Vec::new(),
+                name: "".to_string(),
             };
             connection.send_dht.send(dht_msg);
             let key_msg : DHTMessage = connection.recieve_dht.recv().unwrap();
@@ -290,6 +293,7 @@ fn read_thread(stream: TcpStream, connection: ConnectionRef) -> Result<(), &'sta
                 keys: Vec::new(),
                 data: msg.data,
                 providers: Vec::new(),
+                name: "".to_string(),
             };
             connection.send_dht.send(dht_msg);
         } else if msg.type_of == "PEERS_I_GET" {
@@ -305,6 +309,7 @@ fn read_thread(stream: TcpStream, connection: ConnectionRef) -> Result<(), &'sta
                 keys: Vec::new(),
                 data: new_msg.data.clone(),
                 providers: Vec::new(),
+                name: new_msg.data.1.to_string(),
             };
             connection.send_dht.send(dht_msg);
             let key_msg : DHTMessage = connection.recieve_dht.recv().unwrap();

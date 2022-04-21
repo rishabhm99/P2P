@@ -3,6 +3,7 @@ use std::error::Error;
 
 use crate::Client;
 use crate::key::Key;
+use crate::client::Data;
 
 pub fn console(client : Box<Client>) {
     // Kick it off.
@@ -37,7 +38,9 @@ fn handle_input_line(mut client: Box<Client>, line: String) -> Result<(), Box<dy
         "INSERT" => {
             let name = args.next().unwrap().trim();
             let data = args.next().unwrap().trim();
-            client.put_data(name.to_string(), data.to_string());
+
+            let insert_data: Data = Data {id: 1, vec: data.to_string().into_bytes()};
+            client.put_data(name.to_string(), insert_data);
         },
         "GET" => {
             let key = args.next().unwrap().trim();
