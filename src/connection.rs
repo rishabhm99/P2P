@@ -1,5 +1,5 @@
 use std::net::{TcpStream};
-use std::io::{Write, BufReader, BufRead};
+use std::io::{BufReader, BufRead};
 use std::sync::{Mutex, Arc};
 use std::thread;
 use rand::Rng;
@@ -7,8 +7,10 @@ use rand::Rng;
 use crossbeam::channel::unbounded;
 
 use crate::key::Key;
-use crate::client::{PeerRecord, parse_peer_record, create_empty_peer_record, DhtType, parse_providers, Data};
-use crate::client::empty_data;
+use crate::client::{PeerRecord, parse_peer_record, create_empty_peer_record, DhtType, parse_providers};
+use crate::client_thread::{read_thread, write_thread};
+use crate::data::Data;
+
 
 pub type ConnectionRef = Arc<Connection>;
 
@@ -69,13 +71,15 @@ impl Message {
             let output = format!("P2P/1.0 {}\r\nFROM- ({},{})\r\nTO- ({},{})\r\n\r\n", self.type_of, self.from.0.key, self.from.1, self.to.0.key, self.to.1);
             return output;
         } else if self.type_of == "INSERT" {
-            let output = format!("P2P/1.0 {}\r\nFROM- ({},{})\r\nTO- ({},{})\r\nPROVIDER-{}\r\nDATA_KEY- {}\r\nDATA- {}\r\n\r\n", self.type_of, self.from.0.key, self.from.1, self.to.0.key, self.to.1, self.key.1, self.data.0.key, self.data.1);
+            let data_str = serde_json::to_string(&self.data.1).unwrap();
+            let output = format!("P2P/1.0 {}\r\nFROM- ({},{})\r\nTO- ({},{})\r\nPROVIDER-{}\r\nDATA_KEY- {}\r\nDATA- {}\r\n\r\n", self.type_of, self.from.0.key, self.from.1, self.to.0.key, self.to.1, self.key.1, self.data.0.key,  data_str);
             return output;
         } else if self.type_of == "PEERS_I_GET" {
             let output = format!("P2P/1.0 {}\r\nFROM- ({},{})\r\nTO- ({},{})\r\nDATA_KEY- {}\r\nDATA- {}\r\n\r\n", self.type_of, self.from.0.key, self.from.1, self.to.0.key, self.to.1, self.data.0.key, self.data.1);
             return output;
         } else if self.type_of == "PEERS_R_GET" {
-            let output = format!("P2P/1.0 {}\r\nFROM- ({},{})\r\nTO- ({},{})\r\nDATA_KEY- {}\r\nDATA- {}\r\n\r\n", self.type_of, self.from.0.key, self.from.1, self.to.0.key, self.to.1, self.data.0.key, self.data.1);
+            let out_data = serde_json::to_string(&self.data.1).unwrap();
+            let output = format!("P2P/1.0 {}\r\nFROM- ({},{})\r\nTO- ({},{})\r\nDATA_KEY- {}\r\nDATA- {}\r\n\r\n", self.type_of, self.from.0.key, self.from.1, self.to.0.key, self.to.1, self.data.0.key, out_data);
             return output;
         }
         "".to_string()
@@ -139,10 +143,14 @@ impl Message {
                 }
             } else if key == "DATA" {
                 val = val.trim();
-                data = (data_key, Data {id: 1, vec: val.to_string().into_bytes()});
+                if (val != "") {
+                    let data_obj: Data = serde_json::from_str(&val).unwrap();
+                    data = (data_key, data_obj);
+                }
             } else if key == "DATA_KEY" {
                 let key = val.trim().parse::<u32>().unwrap();
                 data_key = Key{key:key};
+                found_key = (data_key, "".to_string());
             } else if key == "PROVIDERS" {
                 let trimmed = val.trim();
                 if trimmed.len() == 0 { continue; }
@@ -219,120 +227,3 @@ impl Connection {
     }
 }
 
-fn read_thread(stream: TcpStream, connection: ConnectionRef) -> Result<(), &'static str> {
-    let mut reader = BufReader::new(stream);
-    loop {
-
-        let msg = Message::read_message(&mut reader)?;
-
-        if msg.type_of == "INIT" {
-
-        } else if msg.type_of == "PEERS_I" {
-            let mut new_msg = msg.clone();
-            new_msg.from = msg.to;
-            new_msg.to = msg.from.clone();
-            new_msg.type_of = "PEERS_R".to_string();
-            
-            let dht_msg = DHTMessage {
-                type_of: "k_peers".to_string(), 
-                sending_node: msg.from, 
-                key: create_empty_peer_record(), 
-                keys: Vec::new(),
-                data: new_msg.data.clone(),
-                providers: Vec::new(),
-                name: "".to_string(),
-            };
-            connection.send_dht.send(dht_msg);
-            let key_msg : DHTMessage = connection.recieve_dht.recv().unwrap();
-
-            new_msg.keys = key_msg.keys.clone();
-            new_msg.data = key_msg.data.clone();
-            
-            connection.sender.send(new_msg);
-            
-            {
-                let mut conn = connection.finished.lock().unwrap();
-                *conn = true;
-            }
-        } else if msg.type_of == "PROVIDER_GET" {
-            let mut new_msg = msg.clone();
-            new_msg.from = msg.to;
-            new_msg.to = msg.from.clone();
-            new_msg.type_of = "PROVIDERS_GET_REPLY".to_string();
-            
-            let dht_msg = DHTMessage {
-                type_of: "providers".to_string(), 
-                sending_node: msg.from, 
-                key: create_empty_peer_record(), 
-                keys: Vec::new(),
-                data: new_msg.data.clone(),
-                providers: Vec::new(),
-                name: "".to_string(),
-            };
-            connection.send_dht.send(dht_msg);
-            let key_msg : DHTMessage = connection.recieve_dht.recv().unwrap();
-
-            new_msg.providers = key_msg.providers.clone();
-            
-            connection.sender.send(new_msg);
-            
-            {
-                let mut conn = connection.finished.lock().unwrap();
-                *conn = true;
-            }
-        } else if msg.type_of == "PING" {
-            let mut new_msg = msg.clone();
-            new_msg.from = msg.to;
-            new_msg.to = msg.from.clone();
-            connection.sender.send(new_msg);
-        } else if msg.type_of == "INSERT" {
-            let dht_msg = DHTMessage {
-                type_of: "insert".to_string(), 
-                sending_node: msg.from, 
-                key: msg.key, 
-                keys: Vec::new(),
-                data: msg.data,
-                providers: Vec::new(),
-                name: "".to_string(),
-            };
-            connection.send_dht.send(dht_msg);
-        } else if msg.type_of == "PEERS_I_GET" {
-            let mut new_msg = msg.clone();
-            new_msg.from = msg.to;
-            new_msg.to = msg.from.clone();
-            new_msg.type_of = "PEERS_R_GET".to_string();
-            
-            let dht_msg = DHTMessage {
-                type_of: "k_peers".to_string(), 
-                sending_node: msg.from, 
-                key: create_empty_peer_record(), 
-                keys: Vec::new(),
-                data: new_msg.data.clone(),
-                providers: Vec::new(),
-                name: new_msg.data.1.to_string(),
-            };
-            connection.send_dht.send(dht_msg);
-            let key_msg : DHTMessage = connection.recieve_dht.recv().unwrap();
-
-            new_msg.keys = key_msg.keys.clone();
-            new_msg.data = key_msg.data.clone();
-            
-            connection.sender.send(new_msg);
-            
-            {
-                let mut conn = connection.finished.lock().unwrap();
-                *conn = true;
-            }
-        }
-
-    } 
-}
-
-fn write_thread(mut stream: TcpStream, connection: ConnectionRef) {
-    loop {
-        let msg : Message = connection.receiver.recv().unwrap();
-        let _res = stream.write(msg.make_message().as_bytes()).unwrap();
-        stream.flush().unwrap();
-    }
-    
-}

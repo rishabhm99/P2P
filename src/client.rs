@@ -1,44 +1,22 @@
 use std::net::{TcpListener, TcpStream};
 use std::io::{BufReader};
 use std::sync::{Mutex, Arc};
-use std::fmt::{self, Display};
 
 use std::collections::{HashMap};
 use priority_queue::PriorityQueue;
 use rand::Rng;
+use std::error::Error;
 
 use crate::connection::{Connection, ConnectionRef};
 use crate::connection::Message;
 use crate::key::Key;
+use crate::data::Data;
 
 const K : i32 = 20;
 const BOOTNODES: [&'static  str; 1] = [
     "127.0.0.1:12345"
 ];
 
-#[derive(Clone)]
-pub struct Data {
-    pub id: u32,
-    pub vec: Vec<u8>,
-}
-
-impl Data {
-    pub fn create_empty() -> Data {
-        return Data{id: 0, vec: Vec::new()};
-    }
-}
-
-impl Display for Data {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let dat = String::from_utf8(self.vec.clone()).expect("");
-        write!(f, "{}", dat)
-    }
-}
-impl PartialEq for Data {
-    fn eq(&self, other: &Data) -> bool {
-        return self.id == other.id;
-    }
-}
 
 pub type DhtType = Data;
 pub type PeerRecord = (Key, String);
@@ -170,13 +148,13 @@ impl Client {
                     let mut new_msg = msg.clone();
                     new_msg.keys = self.find_k_closest_computers(&new_msg.key.0.clone());
                     //print!("");
-                    let data = new_msg.data.clone();
-                    if empty_data(&data) == false {
-                        if self.local_hash.lock().unwrap().contains_key(&data.0) {
-                            self.providers.lock().unwrap().insert(new_msg.name, new_msg.data.0);    
-                            let val = self.local_hash.lock().unwrap().get(&new_msg.data.0).unwrap().to_string();
-                            new_msg.name = val;
 
+                    let key = new_msg.key.0.clone();
+
+                    if key.key > 0 {
+                        if self.local_hash.lock().unwrap().contains_key(&key) {
+                            let val = self.local_hash.lock().unwrap().get(&key).unwrap().clone();
+                            new_msg.data.1 = val;
                         }
                      
                     }
@@ -198,7 +176,7 @@ impl Client {
         }
     }
 
-    pub fn get_data(&mut self, find_key: Key) -> DhtType {
+    pub fn get_data(&mut self, find_key: Key) -> Result<DhtType, Box<dyn Error>> {
         let comps  = self.find_k_closest_computers(&find_key);
 
         let mut data : (Key, DhtType) = (Key {key: 0}, Data::create_empty());
@@ -231,6 +209,9 @@ impl Client {
             if data.1 == Data::create_empty() {vec.push(1);}
             else { vec.push(0); }
         }
+        if data.1 ==  Data::create_empty() {
+            return Err("Not Found")?;
+        }
 
         for (i, (key, address)) in comps.clone().iter().enumerate() {
             if *key == self.key {continue;}
@@ -260,7 +241,7 @@ impl Client {
         }
         self.local_hash.lock().unwrap().insert(data.0, data.1.clone());    
 
-        return Data::create_empty();
+        return Ok(data.1);
     }
 
     pub fn put_data(&mut self, name: String, data : DhtType) -> () {

@@ -3,11 +3,14 @@ use std::net::{SocketAddrV4, Ipv4Addr, TcpListener};
 use clap::Parser;
 
 use std::thread;
+use crate::data::Data;
 
 mod client;
 mod console_handle;
 mod connection;
 mod key;
+mod client_thread;
+mod data;
 
 use crate::client::Client;
 
@@ -20,6 +23,9 @@ struct Cli {
 
 
 fn main() {
+    let data: Data = Data {id: 1, vec: [65].to_vec()};
+    let s = serde_json::to_string(&data).unwrap();
+    
     std::env::set_var("RUST_BACKTRACE", "1");
     // Initiate Logger
     env_logger::init();
