@@ -43,10 +43,10 @@ impl Message {
     
     pub fn make_message(&self) -> String {
         if self.type_of == "INIT" {
-            let output = format!("P2P/1.0 INIT\r\nFROM- ({},{})\r\nTO- ({},{})\r\n\r\n", self.from.0.key, self.from.1, self.to.0.key, self.to.1);
+            let output = format!("P2P/1.0 INIT\r\nFROM- ({},{})\r\nTO- ({},{})\r\n\r\n\r\n", self.from.0.key, self.from.1, self.to.0.key, self.to.1);
             return output;
         } else if self.type_of == "PEERS_I" {
-            let output = format!("P2P/1.0 {}\r\nFROM- ({},{})\r\nTO- ({},{})\r\n\r\n", self.type_of, self.from.0.key, self.from.1, self.to.0.key, self.to.1);
+            let output = format!("P2P/1.0 {}\r\nFROM- ({},{})\r\nTO- ({},{})\r\n\r\n\r\n", self.type_of, self.from.0.key, self.from.1, self.to.0.key, self.to.1);
             return output;
         } else if self.type_of == "PEERS_R" {
             let mut keys = "".to_string();
@@ -54,10 +54,10 @@ impl Message {
                 keys +=  &("(".to_string() + &key.key.clone().to_string() + &",".to_string() + addr + &") ".to_string());
             }
             let mut output = format!("P2P/1.0 {}\r\nFROM- ({},{})\r\nTO- ({},{})\r\nKEYS- {}", self.type_of, self.from.0.key, self.from.1, self.to.0.key, self.to.1, keys);
-            output += "\r\n\r\n";
+            output += "\r\n\r\n\r\n";
             return output;
         } else if self.type_of == "PROVIDER_GET" {
-            let output = format!("P2P/1.0 {}\r\nFROM- ({},{})\r\nTO- ({},{})\r\n\r\n", self.type_of, self.from.0.key, self.from.1, self.to.0.key, self.to.1);
+            let output = format!("P2P/1.0 {}\r\nFROM- ({},{})\r\nTO- ({},{})\r\n\r\n\r\n", self.type_of, self.from.0.key, self.from.1, self.to.0.key, self.to.1);
             return output;
         } else if self.type_of == "PROVIDERS_GET_REPLY" {
             let mut providers = "".to_string();
@@ -65,21 +65,21 @@ impl Message {
                 providers +=  &("(".to_string() + &name.clone().to_string() + &",".to_string() + &key.key.clone().to_string() + &") ".to_string());
             }
             let mut output = format!("P2P/1.0 {}\r\nFROM- ({},{})\r\nTO- ({},{})\r\nPROVIDERS-{}\r\n", self.type_of, self.from.0.key, self.from.1, self.to.0.key, self.to.1, providers);
-            output += "\r\n\r\n";
+            output += "\r\n\r\n\r\n";
             return output;
         } else if self.type_of == "PING" {
-            let output = format!("P2P/1.0 {}\r\nFROM- ({},{})\r\nTO- ({},{})\r\n\r\n", self.type_of, self.from.0.key, self.from.1, self.to.0.key, self.to.1);
+            let output = format!("P2P/1.0 {}\r\nFROM- ({},{})\r\nTO- ({},{})\r\n\r\n\r\n", self.type_of, self.from.0.key, self.from.1, self.to.0.key, self.to.1);
             return output;
         } else if self.type_of == "INSERT" {
             let data_str = serde_json::to_string(&self.data.1).unwrap();
-            let output = format!("P2P/1.0 {}\r\nFROM- ({},{})\r\nTO- ({},{})\r\nPROVIDER-{}\r\nDATA_KEY- {}\r\nDATA- {}\r\n\r\n", self.type_of, self.from.0.key, self.from.1, self.to.0.key, self.to.1, self.key.1, self.data.0.key,  data_str);
+            let output = format!("P2P/1.0 {}\r\nFROM- ({},{})\r\nTO- ({},{})\r\nPROVIDER-{}\r\nDATA_KEY- {}\r\n\r\n{}\r\n", self.type_of, self.from.0.key, self.from.1, self.to.0.key, self.to.1, self.key.1, self.data.0.key,  data_str);
             return output;
         } else if self.type_of == "PEERS_I_GET" {
-            let output = format!("P2P/1.0 {}\r\nFROM- ({},{})\r\nTO- ({},{})\r\nDATA_KEY- {}\r\nDATA- {}\r\n\r\n", self.type_of, self.from.0.key, self.from.1, self.to.0.key, self.to.1, self.data.0.key, self.data.1);
+            let output = format!("P2P/1.0 {}\r\nFROM- ({},{})\r\nTO- ({},{})\r\nDATA_KEY- {}\r\n\r\n{}\r\n", self.type_of, self.from.0.key, self.from.1, self.to.0.key, self.to.1, self.data.0.key, self.data.1);
             return output;
         } else if self.type_of == "PEERS_R_GET" {
             let out_data = serde_json::to_string(&self.data.1).unwrap();
-            let output = format!("P2P/1.0 {}\r\nFROM- ({},{})\r\nTO- ({},{})\r\nDATA_KEY- {}\r\nDATA- {}\r\n\r\n", self.type_of, self.from.0.key, self.from.1, self.to.0.key, self.to.1, self.data.0.key, out_data);
+            let output = format!("P2P/1.0 {}\r\nFROM- ({},{})\r\nTO- ({},{})\r\nDATA_KEY- {}\r\n\r\n{}\r\n", self.type_of, self.from.0.key, self.from.1, self.to.0.key, self.to.1, self.data.0.key, out_data);
             return output;
         }
         "".to_string()
@@ -142,11 +142,7 @@ impl Message {
                     keys.push(peer);
                 }
             } else if key == "DATA" {
-                val = val.trim();
-                if (val != "") {
-                    let data_obj: Data = serde_json::from_str(&val).unwrap();
-                    data = (data_key, data_obj);
-                }
+              
             } else if key == "DATA_KEY" {
                 let key = val.trim().parse::<u32>().unwrap();
                 data_key = Key{key:key};
@@ -163,7 +159,20 @@ impl Message {
                 let trimmed = val.trim();
                 found_key = (Key {key : 0}, trimmed.clone().to_string());
             }
+        }  
+
+        let mut line = String::with_capacity(512);
+        reader.read_line(&mut line).unwrap();
+        line.pop();
+        line.pop();
+        line.trim();
+
+        println!("{}", line);
+        if (line != "") {
+            let data_obj: Data = serde_json::from_str(&line).unwrap();
+            data = (data_key, data_obj);
         }
+        
         println!("---------------------------------------");
         return Ok(Message {type_of : type_of, from: from, to: to, key: found_key, keys: keys, data: data, providers: providers});
     }

@@ -280,7 +280,6 @@ impl Client {
     pub fn get_peer_record(&mut self) {
         let comps  = self.find_k_closest_computers(&self.key);
         for (key, address) in comps {
-
             let stream = TcpStream::connect(address.clone()).unwrap();
             let mut reader = BufReader::new(stream.try_clone().unwrap());
 
