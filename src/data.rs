@@ -3,6 +3,7 @@ use serde::{Serialize, Deserialize};
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct FileMetadata {
+    pub filename: String,
 }
 
 
@@ -10,12 +11,15 @@ pub struct FileMetadata {
 pub struct Data {
     pub id: u32,
     pub vec: Vec<u8>,
-    //pub file_meta: Result<FileMetadata>,
+
+    #[serde(flatten)]
+    pub file_meta: FileMetadata,
 }
 
 impl Data {
     pub fn create_empty() -> Data {
-        return Data{id: 0, vec: Vec::new()};
+        let meta = FileMetadata {filename: "".to_string()};
+        return Data{id: 0, vec: Vec::new(), file_meta: meta};
     }
 }
 

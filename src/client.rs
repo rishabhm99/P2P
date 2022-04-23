@@ -245,7 +245,7 @@ impl Client {
     }
 
     pub fn put_data(&mut self, name: String, data : DhtType) -> () {
-        let calc_key = Key::generate_hash_from_data(&name);
+        let calc_key = Key::generate_hash_from_data(&data.vec);
 
         self.local_hash.lock().unwrap().insert(calc_key, data.clone());    
         self.providers.lock().unwrap().insert(name.clone(), calc_key.clone());    

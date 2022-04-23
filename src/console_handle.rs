@@ -8,6 +8,7 @@ use std::fs::OpenOptions;
 use crate::Client;
 use crate::key::Key;
 use crate::data::Data;
+use crate::data::FileMetadata;
 
 pub fn console(client : Box<Client>) {
     // Kick it off.
@@ -43,7 +44,8 @@ fn handle_input_line(mut client: Box<Client>, line: String) -> Result<(), Box<dy
             let name = args.next().unwrap().trim();
             let data = args.next().unwrap().trim();
 
-            let insert_data: Data = Data {id: 1, vec: data.to_string().into_bytes()};
+            let meta = FileMetadata {filename: name.to_string()};
+            let insert_data: Data = Data {id: 1, vec: data.to_string().into_bytes(), file_meta: meta};
             client.put_data(name.to_string(), insert_data);
         },
         "GET" => {
@@ -68,9 +70,8 @@ fn handle_input_line(mut client: Box<Client>, line: String) -> Result<(), Box<dy
             let mut buffer = Vec::new();
             reader.read_to_end(&mut buffer)?;
 
-
-            //let insert_data: Data = Data {id: 1, vec: data.to_string().into_bytes()};
-            let insert_data: Data = Data {id: 1, vec: buffer};
+            let meta = FileMetadata {filename: filename.to_string()};
+            let insert_data: Data = Data {id: 1, vec: buffer, file_meta: meta};
             client.put_data(filename.to_string(), insert_data);
         },
         _ => {

@@ -10,8 +10,8 @@ impl Key {
         return self.key ^ other_key.key;
     }
 
-    pub fn generate_hash_from_data(data: &String) -> Key {
-       let hash = fingerprint32(data.as_bytes());
+    pub fn generate_hash_from_data(data: &[u8]) -> Key {
+       let hash = fingerprint32(data);
 
         return Key{key:hash};
     }

@@ -23,9 +23,6 @@ struct Cli {
 
 
 fn main() {
-    let data: Data = Data {id: 1, vec: [65].to_vec()};
-    let s = serde_json::to_string(&data).unwrap();
-    
     std::env::set_var("RUST_BACKTRACE", "1");
     // Initiate Logger
     env_logger::init();
