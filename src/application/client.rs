@@ -75,12 +75,13 @@ impl Client {
     pub fn new(host: String, port: String) -> Box<Client> {
         let connections: Vec<ConnectionRef> = vec![];
         let mut known_nodes =  HashMap::new();
-        let providers =  HashMap::new();
 
-        println!("{} {}", host, port);
+        println!("Hosting on {} {}", host, port);
 
         let address = host + ":" + &port;
         let mut is_bootnode = false;
+        
+        // Search for bootnodes
         for boot in BOOTNODES {
             if boot != address {
                 let temp_key = Key{key:1};
@@ -90,6 +91,7 @@ impl Client {
             }
         }
         
+        // Decide whether node is a bootnode or not
         let new_key = if is_bootnode {
             Key {key: 1}
         } else {
@@ -97,24 +99,29 @@ impl Client {
             Key {key : rng.gen::<u32>()}
         };
 
-        let client =  Box::new(Client {host: address, peer_id: 0, connections: Arc::new(Mutex::new(connections)), 
-                            local_hash : Arc::new(Mutex::new(HashMap::new())), known_nodes: Arc::new(Mutex::new(known_nodes)), 
-                            key: new_key, providers: Arc::new(Mutex::new(providers))});
+        // Create Client Object
+        let client =  Box::new(Client {host: address, peer_id: 0, 
+                                connections: Arc::new(Mutex::new(connections)), 
+                                local_hash : Arc::new(Mutex::new(HashMap::new())), 
+                                known_nodes: Arc::new(Mutex::new(known_nodes)), 
+                                key: new_key, 
+                                providers: Arc::new(Mutex::new(HashMap::new()))});
 
         return client;
     }
+
     pub fn print_state(self) {
         println!("KNOWN NODES");
         for (key, val) in  self.known_nodes.lock().unwrap().iter() {
-            println!(": {} {}", key.key, val);
+            println!("\t{} {}", key.key, val);
         }
         println!("DATA");
         for (key, val) in  self.local_hash.lock().unwrap().iter() {
-            println!(": {} {}", key.key, val);
+            println!("\t{}", key.key);
         }
         println!("Providers");
         for (key, val) in  self.providers.lock().unwrap().iter() {
-            println!(": {} {}", key, val.key);
+            println!("\t{} {}", key, val.key);
         }
     }
 
@@ -161,7 +168,7 @@ impl Client {
                     connection.send_dht.send(new_msg.clone());
                 } else if msg.type_of == "insert" {
                     self.local_hash.lock().unwrap().insert(msg.data.0, msg.data.1.clone());
-                    self.providers.lock().unwrap().insert(msg.key.1, msg.data.0);        
+                    self.providers.lock().unwrap().insert(msg.key.1, msg.data.0); 
                 } else if msg.type_of == "providers" {
                     let mut new_msg = msg.clone();
                     let mut provider_vector: Vec<(String, Key)> = Vec::new();
@@ -264,7 +271,7 @@ impl Client {
                                             calc_key.clone(),
                                             data.clone(),
                                         );
-
+            
             
             
             // SEND TO PEERS REQUESTING K_CLOSEST

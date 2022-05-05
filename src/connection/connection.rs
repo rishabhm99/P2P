@@ -102,8 +102,6 @@ impl Message {
         let type_of : String = args.next().unwrap().to_string();
         let type_of = type_of.trim().to_string();
 
-        println!("---------------------------------------");
-        println!("Receieved: {}", type_of);
 
         let mut from = create_empty_peer_record();
         let mut to = create_empty_peer_record();
@@ -121,7 +119,6 @@ impl Message {
             }
             line.pop();
             line.pop();
-            println!("{}", line);
             
             let mut args = line.split('-');
             let key = args.next().ok_or("Error Parsing")?;
@@ -140,13 +137,11 @@ impl Message {
                 for new_key in key_list {
                     let peer = parse_peer_record(new_key.clone());
                     keys.push(peer);
-                }
-            } else if key == "DATA" {
-              
+                }              
             } else if key == "DATA_KEY" {
                 let key = val.trim().parse::<u32>().unwrap();
                 data_key = Key{key:key};
-                found_key = (data_key, "".to_string());
+                found_key.0 = data_key;
             } else if key == "PROVIDERS" {
                 let trimmed = val.trim();
                 if trimmed.len() == 0 { continue; }
@@ -157,7 +152,7 @@ impl Message {
                 }
             } else if key == "PROVIDER" {
                 let trimmed = val.trim();
-                found_key = (Key {key : 0}, trimmed.clone().to_string());
+                found_key.1 = trimmed.to_string();
             }
         }  
 
@@ -167,13 +162,10 @@ impl Message {
         line.pop();
         line.trim();
 
-        println!("{}", line);
         if (line != "") {
             let data_obj: Data = serde_json::from_str(&line).unwrap();
             data = (data_key, data_obj);
-        }
-        
-        println!("---------------------------------------");
+        }        
         return Ok(Message {type_of : type_of, from: from, to: to, key: found_key, keys: keys, data: data, providers: providers});
     }
 }

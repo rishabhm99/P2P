@@ -5,14 +5,46 @@ use clap::Parser;
 use std::thread;
 use crate::data::Data;
 
-mod client;
+use log::{Record, Level, Metadata, LevelFilter, SetLoggerError};
+
+#[path = "./application/console_handle.rs"]
 mod console_handle;
-mod connection;
+
+#[path = "./application/client.rs"]
+mod client;
+
+#[path = "./application/key.rs"]
 mod key;
-mod client_thread;
+
+#[path = "./application/data.rs"]
 mod data;
 
+#[path = "./connection/connection.rs"]
+mod connection;
+
+#[path = "./connection/client_thread.rs"]
+mod client_thread;
+
 use crate::client::Client;
+
+
+static CONSOLE_LOGGER: ConsoleLogger = ConsoleLogger;
+struct ConsoleLogger;
+
+impl log::Log for ConsoleLogger {
+  fn enabled(&self, metadata: &Metadata) -> bool {
+     metadata.level() <= Level::Info
+    }
+
+    fn log(&self, record: &Record) {
+        if self.enabled(record.metadata()) {
+            println!("{}: - {}", record.level(), record.args());
+        }
+    }
+
+    fn flush(&self) {}
+}
+
 
 
 #[derive(clap::Parser, Debug)]
@@ -22,10 +54,13 @@ struct Cli {
 }
 
 
+
 fn main() {
+    
     std::env::set_var("RUST_BACKTRACE", "1");
     // Initiate Logger
-    env_logger::init();
+    log::set_logger(&CONSOLE_LOGGER);
+    log::set_max_level(LevelFilter::Info);
 
     // Parse Inputs
     let  cli = Cli::parse();

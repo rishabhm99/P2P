@@ -11,7 +11,6 @@ use crate::data::Data;
 use crate::data::FileMetadata;
 
 pub fn console(client : Box<Client>) {
-    // Kick it off.
     loop {
         let mut line = String::new();
         print!(">: ");
@@ -50,11 +49,13 @@ fn handle_input_line(mut client: Box<Client>, line: String) -> Result<(), Box<dy
         },
         "GET" => {
             let key = args.next().unwrap().trim();
+            let save_name = args.next().unwrap().trim();
+
             let parse_key: u32 = key.parse::<u32>().expect(key);
 
             let data = client.get_data(Key {key: parse_key}).unwrap();
 
-            let mut file = File::create("./file.txt")?;
+            let mut file = File::create(save_name)?;
             file.write_all(&data.vec);
             
             println!("{:?}", data);

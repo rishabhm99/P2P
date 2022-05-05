@@ -7,12 +7,16 @@ use crate::client::empty_data;
 use crate::connection::{Message, ConnectionRef, DHTMessage};
 use crate::data::Data;
 
+use log::info;
+
 pub fn read_thread(stream: TcpStream, connection: ConnectionRef) -> Result<(), &'static str> {
     let mut reader = BufReader::new(stream);
     loop {
-
         let msg = Message::read_message(&mut reader)?;
 
+        let output = format!("RECIEVED: {} FROM- ({},{}) TO- ({},{})",  msg.type_of, msg.from.0.key, msg.from.1, msg.to.0.key, msg.to.1);
+        log::info!("{}", output);
+        
         if msg.type_of == "INIT" {
 
         } else if msg.type_of == "PEERS_I" {
@@ -77,11 +81,11 @@ pub fn read_thread(stream: TcpStream, connection: ConnectionRef) -> Result<(), &
             let dht_msg = DHTMessage {
                 type_of: "insert".to_string(), 
                 sending_node: msg.from, 
-                key: msg.key, 
+                key: msg.key.clone(), 
                 keys: Vec::new(),
                 data: msg.data,
                 providers: Vec::new(),
-                name: "".to_string(),
+                name: msg.key.1.clone(),
             };
             connection.send_dht.send(dht_msg);
         } else if msg.type_of == "PEERS_I_GET" {
@@ -112,7 +116,6 @@ pub fn read_thread(stream: TcpStream, connection: ConnectionRef) -> Result<(), &
                 *conn = true;
             }
         }
-
     } 
 }
 
@@ -121,6 +124,9 @@ pub fn write_thread(mut stream: TcpStream, connection: ConnectionRef) {
         let msg : Message = connection.receiver.recv().unwrap();
         let _res = stream.write(msg.make_message().as_bytes()).unwrap();
         stream.flush().unwrap();
+        
+        let output = format!("SENT: {} FROM- ({},{}) TO- ({},{})", msg.type_of, msg.from.0.key, msg.from.1, msg.to.0.key, msg.to.1);
+        log::info!("{}", output);
     }
     
 }
